@@ -13,7 +13,7 @@ const BANDS = [
   { f: 8000, type: 'highshelf', label: '8k+' },
 ];
 const EQ_RANGE = 15; // ± dB
-const DEFAULTS = { color: 0.5, speed: 1, volume: 0.6, eq: BANDS.map(() => 0), stereo: true, bgMode: true, sleep: 0 };
+const DEFAULTS = { color: 0.5, highcut: 1, pulseRate: 0.45, pulseDepth: 0, volume: 0.6, eq: BANDS.map(() => 0), stereo: true, bgMode: true, sleep: 0 };
 
 const state = (() => {
   try {
@@ -62,7 +62,8 @@ function buildGraph() {
     noise = new AudioWorkletNode(ctx, 'noise', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2] });
     noise.port.onmessage = (e) => { if (e.data.type === 'sleepDone') { state.sleep = 0; renderSleep(); save(); stop(); } };
     noise.port.postMessage({ type: 'color', value: state.color, immediate: true });
-    noise.port.postMessage({ type: 'speed', value: state.speed, immediate: true });
+    noise.port.postMessage({ type: 'highcut', value: state.highcut, immediate: true });
+    noise.port.postMessage({ type: 'pulse', rate: pulseHz(state.pulseRate), depth: state.pulseDepth, immediate: true });
     noise.port.postMessage({ type: 'stereo', value: state.stereo });
     noise.connect(hp);
   });
@@ -222,20 +223,41 @@ function setColor(c, immediate = false) {
 }
 $('#color').addEventListener('input', (e) => setColor(+e.target.value));
 
-// Speed (texture): 1 = full bandwidth/fizzy, 0 = band-limited to ~250 Hz/slow churn
+// High cut (in EQ section): 1 = full bandwidth, 0 = band-limited to ~250 Hz
 const speedCutoff = (s) => 20000 * Math.pow(250 / 20000, 1 - s);
-function renderSpeed() {
-  $('#speed').value = state.speed;
-  const fc = speedCutoff(state.speed);
-  $('#speedOut').textContent = state.speed >= 0.995 ? 'full · fizzy'
-    : `${Math.round(state.speed * 100)}% · up to ${fc >= 1000 ? (fc / 1000).toFixed(1) + ' kHz' : Math.round(fc) + ' Hz'}`;
+function renderHighcut() {
+  $('#highcut').value = state.highcut;
+  const fc = speedCutoff(state.highcut);
+  $('#highcutOut').textContent = state.highcut >= 0.995 ? 'off'
+    : `above ${fc >= 1000 ? (fc / 1000).toFixed(1) + ' kHz' : Math.round(fc) + ' Hz'}`;
 }
-$('#speed').addEventListener('input', (e) => {
-  state.speed = +e.target.value;
-  noise && noise.port.postMessage({ type: 'speed', value: state.speed });
-  renderSpeed(); drawSpectrum(); save();
+$('#highcut').addEventListener('input', (e) => {
+  state.highcut = +e.target.value;
+  noise && noise.port.postMessage({ type: 'highcut', value: state.highcut });
+  renderHighcut(); drawSpectrum(); save();
 });
-$('#speed').addEventListener('dblclick', () => { $('#speed').value = 1; $('#speed').dispatchEvent(new Event('input')); });
+
+// Pulses ("engine RPM"): rate 1 … 120 bursts/s on a log scale
+const pulseHz = (p) => Math.pow(120, p);
+function renderPulse() {
+  $('#pulseRate').value = state.pulseRate;
+  $('#pulseDepth').value = state.pulseDepth;
+  const hz = pulseHz(state.pulseRate);
+  $('#pulseRateOut').textContent = state.pulseDepth === 0 ? 'off — raise Strength'
+    : `${hz < 10 ? hz.toFixed(1) : Math.round(hz)} pulses/s · ≈${Math.round(hz * 30 / 10) * 10} rpm`;
+  $('#pulseDepthOut').textContent = state.pulseDepth === 0 ? 'off' : Math.round(state.pulseDepth * 100) + '%';
+  $('#pulseCard').classList.toggle('dim', state.pulseDepth === 0);
+}
+$('#pulseRate').addEventListener('input', (e) => {
+  state.pulseRate = +e.target.value;
+  noise && noise.port.postMessage({ type: 'pulse', rate: pulseHz(state.pulseRate) });
+  renderPulse(); save();
+});
+$('#pulseDepth').addEventListener('input', (e) => {
+  state.pulseDepth = +e.target.value;
+  noise && noise.port.postMessage({ type: 'pulse', depth: state.pulseDepth });
+  renderPulse(); save();
+});
 document.querySelectorAll('.presets button').forEach((b) => b.addEventListener('click', () => setColor(+b.dataset.color)));
 
 $('#volume').value = state.volume;
@@ -268,6 +290,7 @@ BANDS.forEach((b, i) => {
   input.addEventListener('dblclick', () => { input.value = 0; input.dispatchEvent(new Event('input')); });
 });
 $('#eqReset').addEventListener('click', () => {
+  $('#highcut').value = 1; $('#highcut').dispatchEvent(new Event('input'));
   document.querySelectorAll('#eq input').forEach((inp) => { inp.value = 0; inp.dispatchEvent(new Event('input')); });
 });
 
@@ -355,8 +378,8 @@ function drawSpectrum() {
   const accent = css.getPropertyValue('--accent');
   g.beginPath();
   for (let i = 0; i < NP; i++) {
-    const fc = speedCutoff(state.speed);
-    const lp = state.speed >= 0.995 ? 0 : -10 * Math.log10(1 + (freqs[i] / fc) ** 8);
+    const fc = speedCutoff(state.highcut);
+    const lp = state.highcut >= 0.995 ? 0 : -10 * Math.log10(1 + (freqs[i] / fc) ** 8);
     const db = colorDb(freqs[i], state.color) - ref + eqDb[i] + lp;
     i ? g.lineTo(X(freqs[i]), Y(db)) : g.moveTo(X(freqs[i]), Y(db));
   }
@@ -370,7 +393,7 @@ function drawSpectrum() {
 window.addEventListener('resize', drawSpectrum);
 
 // ---------- init ----------
-renderColor(); renderSpeed(); renderVol(); renderSettings(); updateUI(); drawSpectrum();
+renderColor(); renderHighcut(); renderPulse(); renderVol(); renderSettings(); updateUI(); drawSpectrum();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));

@@ -34,10 +34,16 @@
         <button data-color="0.5">Pink</button>
         <button data-color="1">Brown</button>
       </div>
-      <div class="row speedrow"><label for="speed">Speed</label><output id="speedOut"></output></div>
-      <input type="range" id="speed" min="0" max="1" step="0.01">
-      <div class="ends"><span>slow · smooth</span><span>fast · fizzy</span></div>
       <canvas id="spectrum" aria-label="Frequency response"></canvas>
+    </section>
+
+    <section class="card" id="pulseCard">
+      <div class="row"><label for="pulseDepth">Pulse strength</label><output id="pulseDepthOut"></output></div>
+      <input type="range" id="pulseDepth" min="0" max="1" step="0.01">
+      <div class="ends"><span>steady</span><span>pure pulses</span></div>
+      <div class="row speedrow"><label for="pulseRate">Speed</label><output id="pulseRateOut"></output></div>
+      <input type="range" id="pulseRate" min="0" max="1" step="0.005">
+      <div class="ends"><span>slow chug</span><span>fast drone</span></div>
     </section>
 
     <section class="card">
@@ -48,6 +54,8 @@
     <details class="card">
       <summary>Equalizer <small>fine-tune frequency bands</small></summary>
       <div id="eq"></div>
+      <div class="row speedrow"><label for="highcut">High cut</label><output id="highcutOut"></output></div>
+      <input type="range" id="highcut" min="0" max="1" step="0.01">
       <button id="eqReset" class="ghost">Reset EQ</button>
     </details>
 

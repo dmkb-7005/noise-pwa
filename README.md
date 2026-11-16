@@ -1,12 +1,12 @@
 # Noise — live colored-noise PWA
 
-White → pink → brown noise, generated sample-by-sample (never a loop), with a Speed (texture) control, an 8-band EQ,
+White → pink → brown noise, generated sample-by-sample (never a loop), with pulses ("engine RPM": Strength + Speed), an 8-band EQ + high cut,
 sleep timer, stereo/mono, offline support and lock-screen controls.
 
 ## Files
 | File | Purpose |
 |---|---|
-| `noise-worklet.js` | DSP: random samples → cascade of 10 octave-spaced pole/zero filters. One "color" value (0–1) sets the slope continuously: 0 = white (0 dB/oct), 0.5 = pink (−3), 1 = brown (−6). A second value, Speed (0–1), acts like playback speed: a 4th-order low-pass sweeps from full bandwidth (fast, fizzy) down to ~250 Hz (slow, smooth churn) while keeping the color tilt. Power-normalized so loudness stays steady. Sleep timer + fades run here, sample-accurate. |
+| `noise-worklet.js` | DSP: random samples → cascade of 10 octave-spaced pole/zero filters. One "color" value (0–1) sets the slope continuously: 0 = white (0 dB/oct), 0.5 = pink (−3), 1 = brown (−6). Pulses: the noise is shaped into bursts (1.5 ms attack, decay ≈30 % of the period) at 1–120 bursts/s, each with random timing (±15 %) and strength, blended with steady noise by Pulse strength. High cut (in the EQ panel): 4th-order low-pass from 20 kHz down to ~250 Hz. Power-normalized so loudness stays steady. Sleep timer + fades run here, sample-accurate. |
 | `app.js` | Audio graph (worklet → 18 Hz HP → 8 EQ bands → limiter → volume), UI, Media Session, settings in localStorage. |
 | `sw.js` | Offline cache. **Bump `VERSION` after every change**, or phones keep the old copy. |
 | `index.html`, `style.css`, `manifest.webmanifest`, `icons/` | App shell. |

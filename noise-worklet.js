@@ -22,10 +22,16 @@ const GRID = 96;          // frequency points used for normalization
 const MIN_FC = 250;       // slowest "speed": noise band-limited to ~250 Hz
 const BUTTER_Q = [0.5412, 1.3066]; // 4th-order Butterworth low-pass = 2 biquads
 
-// "speed" s in [0, 1] works like playback speed of the noise: how fast the
-// waveform is allowed to change. s = 1 → full bandwidth (fast, fizzy);
-// lower s → everything above a cutoff (20 kHz … 250 Hz, log scale) is removed
-// (slow, smooth churn). Color tilt is kept; loudness is re-normalized.
+// "highcut" h in [0, 1]: h = 1 → full bandwidth; lower h → everything above a
+// cutoff (20 kHz … 250 Hz, log scale) is removed. Loudness is re-normalized.
+
+// Pulses ("engine RPM"): the noise is shaped into bursts — sharp attack, decay —
+// at `rate` bursts per second. Each burst gets random timing (±15 %) and random
+// strength, so the rhythm is organic and never repeats. `depth` blends from
+// steady noise (0) to pure bursts (1).
+const PULSE_ATTACK = 0.0015 * sampleRate; // 1.5 ms
+const PULSE_DECAY = 0.3;                  // decay time constant, fraction of the period
+const PULSE_K = 3.29;                     // keeps RMS ≈ steady noise at depth 1
 
 class NoiseProcessor extends AudioWorkletProcessor {
   constructor() {
@@ -45,6 +51,9 @@ class NoiseProcessor extends AudioWorkletProcessor {
     this.lz2 = [new Float64Array(2), new Float64Array(2)];
     this.lpOn = false;
     this.speed = this.speedTarget = 1;
+
+    this.pRate = 10; this.pDepth = 0; this.pDepthCur = 0;
+    this.pT = 0; this.pLen = 0; this.pAmp = 0; this.pTau = 1;
 
     // Fade envelope (start/stop without clicks)
     this.level = 0;
@@ -84,7 +93,12 @@ class NoiseProcessor extends AudioWorkletProcessor {
         this.target = Math.min(1, Math.max(0, +m.value));
         if (m.immediate) { this.color = this.target; this.computeCoeffs(); }
         break;
-      case 'speed':
+      case 'pulse':
+        if (m.rate > 0) this.pRate = m.rate;
+        if (m.depth !== undefined) this.pDepth = Math.min(1, Math.max(0, m.depth));
+        if (m.immediate) this.pDepthCur = this.pDepth;
+        break;
+      case 'highcut':
         this.speedTarget = Math.min(1, Math.max(0, +m.value));
         if (m.immediate) { this.speed = this.speedTarget; this.computeCoeffs(); }
         break;
@@ -104,6 +118,14 @@ class NoiseProcessor extends AudioWorkletProcessor {
         }
         break;
     }
+  }
+
+  newPulse() {
+    const P = sampleRate / this.pRate;
+    this.pLen = Math.max(16, Math.round(P * (1 + 0.3 * (Math.random() - 0.5))));
+    this.pAmp = 0.55 + 0.45 * Math.random();
+    this.pTau = this.pLen * PULSE_DECAY;
+    this.pT = 0;
   }
 
   computeCoeffs() {
@@ -185,6 +207,17 @@ class NoiseProcessor extends AudioWorkletProcessor {
           if (this.sleepLeft < this.sleepFade) { const s = this.sleepLeft / this.sleepFade; g *= s * s; }
           this.sleepLeft--;
         }
+      }
+      // pulses
+      if (this.pDepthCur !== this.pDepth) {
+        const dd = this.pDepth - this.pDepthCur;
+        this.pDepthCur = Math.abs(dd) < 1e-4 ? this.pDepth : this.pDepthCur + dd * 0.0005;
+      }
+      if (this.pDepthCur > 0) {
+        if (this.pT >= this.pLen) this.newPulse();
+        const t = this.pT++;
+        const pe = this.pAmp * Math.exp(-t / this.pTau) * Math.min(1, t / PULSE_ATTACK) * PULSE_K;
+        g *= 1 - this.pDepthCur + this.pDepthCur * pe;
       }
       env[i] = g * this.norm;
     }
