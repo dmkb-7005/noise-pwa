@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0d1014">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Noise">
+  <title>Noise</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Noise</h1>
+      <span id="status" aria-live="polite"></span>
+    </header>
+
+    <button id="play" class="play" aria-label="Play" aria-pressed="false">
+      <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
+      <svg class="i-stop" viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="6.5" width="11" height="11" rx="2"/></svg>
+    </button>
+
+    <section class="card">
+      <div class="row"><label for="color">Color</label><output id="colorOut"></output></div>
+      <input type="range" id="color" class="color-slider" min="0" max="1" step="0.01">
+      <div class="presets">
+        <button data-color="0">White</button>
+        <button data-color="0.5">Pink</button>
+        <button data-color="1">Brown</button>
+      </div>
+      <canvas id="spectrum" aria-label="Frequency response"></canvas>
+    </section>
+
+    <section class="card">
+      <div class="row"><label for="volume">Volume</label><output id="volOut"></output></div>
+      <input type="range" id="volume" min="0" max="1" step="0.01">
+    </section>
+
+    <details class="card">
+      <summary>Equalizer <small>fine-tune frequency bands</small></summary>
+      <div id="eq"></div>
+      <button id="eqReset" class="ghost">Reset EQ</button>
+    </details>
+
+    <section class="card">
+      <div class="row"><label>Sleep timer</label><output id="sleepLeft"></output></div>
+      <div id="sleep" class="chips">
+        <button data-min="0">Off</button>
+        <button data-min="15">15</button>
+        <button data-min="30">30</button>
+        <button data-min="60">60</button>
+        <button data-min="90">90</button>
+        <button data-min="120">120</button>
+      </div>
+    </section>
+
+    <details class="card">
+      <summary>Settings</summary>
+      <label class="toggle"><input type="checkbox" id="stereo"> <span>Stereo (independent noise per ear)</span></label>
+      <label class="toggle"><input type="checkbox" id="bgMode"> <span>Background mode (play through media channel so it keeps going with the screen off)</span></label>
+      <p class="hint">Noise is synthesized live — a new random value for every sample, never a loop.</p>
+    </details>
+  </main>
+  <div id="toast" role="status"></div>
+  <audio id="sink" playsinline></audio>
+  <script src="app.js"></script>
+</body>
+</html>
