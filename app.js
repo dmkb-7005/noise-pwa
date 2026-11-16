@@ -13,7 +13,7 @@ const BANDS = [
   { f: 8000, type: 'highshelf', label: '8k+' },
 ];
 const EQ_RANGE = 15; // ± dB
-const DEFAULTS = { color: 0.5, volume: 0.6, eq: BANDS.map(() => 0), stereo: true, bgMode: true, sleep: 0 };
+const DEFAULTS = { color: 0.5, speed: 1, volume: 0.6, eq: BANDS.map(() => 0), stereo: true, bgMode: true, sleep: 0 };
 
 const state = (() => {
   try {
@@ -62,6 +62,7 @@ function buildGraph() {
     noise = new AudioWorkletNode(ctx, 'noise', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2] });
     noise.port.onmessage = (e) => { if (e.data.type === 'sleepDone') { state.sleep = 0; renderSleep(); save(); stop(); } };
     noise.port.postMessage({ type: 'color', value: state.color, immediate: true });
+    noise.port.postMessage({ type: 'speed', value: state.speed, immediate: true });
     noise.port.postMessage({ type: 'stereo', value: state.stereo });
     noise.connect(hp);
   });
@@ -220,6 +221,21 @@ function setColor(c, immediate = false) {
   renderColor(); drawSpectrum(); updateMediaSession(); save();
 }
 $('#color').addEventListener('input', (e) => setColor(+e.target.value));
+
+// Speed (texture): 1 = full bandwidth/fizzy, 0 = band-limited to ~250 Hz/slow churn
+const speedCutoff = (s) => 20000 * Math.pow(250 / 20000, 1 - s);
+function renderSpeed() {
+  $('#speed').value = state.speed;
+  const fc = speedCutoff(state.speed);
+  $('#speedOut').textContent = state.speed >= 0.995 ? 'full · fizzy'
+    : `${Math.round(state.speed * 100)}% · up to ${fc >= 1000 ? (fc / 1000).toFixed(1) + ' kHz' : Math.round(fc) + ' Hz'}`;
+}
+$('#speed').addEventListener('input', (e) => {
+  state.speed = +e.target.value;
+  noise && noise.port.postMessage({ type: 'speed', value: state.speed });
+  renderSpeed(); drawSpectrum(); save();
+});
+$('#speed').addEventListener('dblclick', () => { $('#speed').value = 1; $('#speed').dispatchEvent(new Event('input')); });
 document.querySelectorAll('.presets button').forEach((b) => b.addEventListener('click', () => setColor(+b.dataset.color)));
 
 $('#volume').value = state.volume;
@@ -339,7 +355,9 @@ function drawSpectrum() {
   const accent = css.getPropertyValue('--accent');
   g.beginPath();
   for (let i = 0; i < NP; i++) {
-    const db = colorDb(freqs[i], state.color) - ref + eqDb[i];
+    const fc = speedCutoff(state.speed);
+    const lp = state.speed >= 0.995 ? 0 : -10 * Math.log10(1 + (freqs[i] / fc) ** 8);
+    const db = colorDb(freqs[i], state.color) - ref + eqDb[i] + lp;
     i ? g.lineTo(X(freqs[i]), Y(db)) : g.moveTo(X(freqs[i]), Y(db));
   }
   g.strokeStyle = accent; g.lineWidth = 2.5; g.lineJoin = 'round'; g.stroke();
@@ -352,7 +370,7 @@ function drawSpectrum() {
 window.addEventListener('resize', drawSpectrum);
 
 // ---------- init ----------
-renderColor(); renderVol(); renderSettings(); updateUI(); drawSpectrum();
+renderColor(); renderSpeed(); renderVol(); renderSettings(); updateUI(); drawSpectrum();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));

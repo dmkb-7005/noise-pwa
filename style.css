@@ -78,3 +78,6 @@ summary small { color: var(--muted); font-weight: 400; margin-left: 6px; }
   transition: opacity .25s, transform .25s; max-width: 90vw;
 }
 #toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+.speedrow { margin-top: 18px; }
+.ends { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; margin-top: 2px; }

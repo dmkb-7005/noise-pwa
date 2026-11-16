@@ -1,5 +1,5 @@
 // Offline app shell. Bump VERSION whenever you change any file.
-const VERSION = 'noise-v1';
+const VERSION = 'noise-v2';
 const ASSETS = [
   './', 'index.html', 'style.css', 'app.js', 'noise-worklet.js', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png', 'icons/apple-touch-icon.png',
